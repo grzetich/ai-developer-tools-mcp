@@ -4,7 +4,7 @@
 
 This MCP server enables Claude and other AI assistants to query real-time adoption metrics, trends, and comparisons for popular AI coding tools like OpenAI SDK, Anthropic SDK, Cursor, GitHub Copilot, and LangChain.
 
-[![MCP Version](https://img.shields.io/badge/MCP-0.5.0-blue.svg)](https://github.com/modelcontextprotocol)
+[![MCP Version](https://img.shields.io/badge/MCP-1.0.0-blue.svg)](https://github.com/modelcontextprotocol)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
 
