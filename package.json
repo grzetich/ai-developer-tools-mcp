@@ -1,0 +1,31 @@
+{
+  "name": "ai-developer-tools-mcp",
+  "version": "1.0.0",
+  "description": "Educational MCP server demonstrating how to expose AI developer tool intelligence through the Model Context Protocol",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node test/test-tools.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "developer-tools",
+    "claude",
+    "anthropic"
+  ],
+  "author": "Ed Grzetich",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "dotenv": "^16.3.1"
+  }
+}
