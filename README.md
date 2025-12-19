@@ -42,7 +42,7 @@ Claude uses the exposed tools to fetch data and present insights in natural lang
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/ai-developer-tools-mcp.git
+git clone https://github.com/grzetich/ai-developer-tools-mcp.git
 cd ai-developer-tools-mcp
 
 # Install dependencies
@@ -580,4 +580,4 @@ Building AI development intelligence at [Vibe Data](https://vibe-data.com)
 ---
 
 **Questions? Issues? Ideas?**
-[Open an issue](https://github.com/yourusername/ai-developer-tools-mcp/issues) or reach out!
+[Open an issue](https://github.com/grzetich/ai-developer-tools-mcp/issues) or reach out!
