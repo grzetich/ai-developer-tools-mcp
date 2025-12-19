@@ -418,7 +418,7 @@ For the production deployment at [vibe-data.com](https://vibe-data.com), the imp
 - Comprehensive logging and alerting
 - Horizontal scaling for high availability
 
-If you're interested in using this professionally, check out [vibe-data.com/pricing](https://vibe-data.com/pricing) or [contact me](mailto:ed@vibe-data.com).
+If you're interested in using this professionally, check out [vibe-data.com/pricing](https://vibe-data.com/pricing) or [contact me](mailto:ed.grzetich@gmail.com).
 
 ---
 
@@ -566,7 +566,7 @@ Building AI development intelligence at [Vibe Data](https://vibe-data.com)
 
 - GitHub: [@grzetich](https://github.com/grzetich)
 - Website: [vibe-data.com](https://vibe-data.com)
-- Email: ed@vibe-data.com
+- Email: ed.grzetich@gmail.com
 
 ---
 
@@ -575,7 +575,6 @@ Building AI development intelligence at [Vibe Data](https://vibe-data.com)
 - [MCP Documentation](https://github.com/modelcontextprotocol/docs)
 - [Claude Desktop MCP Setup](https://docs.anthropic.com/claude/docs/model-context-protocol)
 - [Vibe Data Production Dashboard](https://vibe-data.com/dashboard)
-- [Blog: Building an MCP Server](https://vibe-data.com/blog/building-mcp-servers)
 
 ---
 
