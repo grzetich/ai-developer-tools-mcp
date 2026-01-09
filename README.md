@@ -1,8 +1,8 @@
 # AI Developer Tools MCP Server
 
-**Educational reference implementation demonstrating how to expose AI development tool intelligence through the Model Context Protocol (MCP).**
+**Educational reference implementation demonstrating how to build MCP servers as bridges to existing REST APIs.**
 
-This MCP server enables Claude and other AI assistants to query real-time adoption metrics, trends, and comparisons for popular AI coding tools like OpenAI SDK, Anthropic SDK, Cursor, GitHub Copilot, and LangChain.
+This MCP server shows how to expose AI development tool intelligence through the Model Context Protocol (MCP) by wrapping a REST API with a conversational interface. It's designed as a learning resource for developers who want to understand the MCP-as-API-bridge pattern.
 
 [![MCP Version](https://img.shields.io/badge/MCP-1.0.0-blue.svg)](https://github.com/modelcontextprotocol)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -10,24 +10,184 @@ This MCP server enables Claude and other AI assistants to query real-time adopti
 
 ---
 
-## What It Does
+## Architecture: MCP as an API Bridge
 
-This MCP server makes AI development tool intelligence accessible through natural conversation with Claude. Instead of manually searching NPM stats, GitHub, and Stack Overflow, you can ask:
+This project demonstrates the **recommended pattern** for MCP servers: wrapping an existing REST API to provide conversational access, rather than building everything from scratch.
+
+### The Pattern
+```mermaid
+graph TB
+    subgraph " "
+        DB[(Database<br/>PostgreSQL)]
+        API[REST API<br/>Business Logic<br/>Auth • Rate Limiting • Caching]
+        DB --> API
+    end
+    
+    API --> |JSON| DEV[Direct API Access]
+    API --> |Bridge| MCP[MCP Server<br/>~200 lines<br/>Format JSON → NL]
+    
+    DEV --> DEVS[👨‍💻 Developers<br/>Programmatic Access]
+    MCP --> USERS[💬 Users + Claude<br/>Conversational Access]
+    
+    style DB fill:#e8f5e9,stroke:#43a047
+    style API fill:#e3f2fd,stroke:#1976d2,stroke-width:3px
+    style DEV fill:#fff3e0,stroke:#f57c00
+    style MCP fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style DEVS fill:#fff3e0,stroke:#f57c00
+    style USERS fill:#f3e5f5,stroke:#7b1fa2
+```
+
+### Why This Architecture?
+
+**Single Source of Truth**
+- All business logic lives in the REST API
+- Authentication, rate limiting, caching happen once
+- API changes automatically flow through to MCP
+
+**Dual Access Patterns**
+- Developers use API directly for programmatic access
+- Non-technical users get conversational access via Claude
+- Same data, different interfaces for different needs
+
+**Thin Wrapper**
+- MCP server is ~200 lines of formatting code
+- Calls existing API endpoints
+- Transforms JSON responses → natural language
+- Easy to maintain and extend
+
+### What It Does
+
+This MCP server makes AI development tool intelligence accessible through natural conversation with Claude. Instead of manually querying APIs or clicking through dashboards, you can ask:
 
 **Example Queries:**
-- _"Compare the adoption of OpenAI SDK vs Anthropic SDK"_
-- _"What are the fastest-growing AI coding tools this month?"_
-- _"Show me the growth history of Cursor over the last 6 months"_
-- _"Find all LLM API frameworks with over 5M downloads"_
+
+* *"Compare the adoption of OpenAI SDK vs Anthropic SDK"*
+* *"What are the fastest-growing AI coding tools this month?"*
+* *"Show me the growth history of Cursor over the last 6 months"*
+* *"Find all LLM API frameworks with over 5M downloads"*
 
 Claude uses the exposed tools to fetch data and present insights in natural language, complete with growth trends, community metrics, and comparative analysis.
 
 **What Data Is Exposed:**
-- NPM download statistics (weekly/monthly)
-- GitHub repository metrics (stars, activity)
-- Community engagement (Stack Overflow questions, Reddit mentions)
-- Historical growth trends
-- Tool metadata (descriptions, categories, package names)
+
+* NPM download statistics (weekly/monthly)
+* GitHub repository metrics (stars, activity)
+* Community engagement (Stack Overflow questions, Reddit mentions)
+* Historical growth trends
+* Tool metadata (descriptions, categories, package names)
+
+---
+
+## Code Structure
+```
+ai-developer-tools-mcp/
+├── src/
+│   ├── index.js           # MCP server entry point
+│   ├── tools/             # MCP tool definitions
+│   │   ├── compare.js     # Compare multiple tools
+│   │   ├── trending.js    # Get trending tools
+│   │   ├── history.js     # Historical data
+│   │   └── search.js      # Search/filter tools
+│   ├── api/               # API client layer (THE BRIDGE)
+│   │   └── client.js      # Simulates REST API calls
+│   ├── data/              # Mock data (simulates database)
+│   │   └── mock-data.js   # Sample data
+│   └── utils/             # Formatters
+│       └── formatters.js  # JSON → Natural language
+├── test/
+│   └── test-tools.js      # Test suite
+├── .env.example
+├── package.json
+└── README.md
+```
+
+### Key Layers
+
+**1. MCP Tools (`src/tools/`)** 
+- Define what Claude can call
+- Receive structured parameters from Claude
+- Call the API client
+- Return formatted responses
+
+**2. API Client (`src/api/client.js`)** ⭐ **THE BRIDGE**
+- Simulates REST API calls in this demo
+- In production: makes real HTTP requests
+- Handles authentication, errors, timeouts
+- Returns JSON responses
+
+**3. Formatters (`src/utils/formatters.js`)**
+- Transform JSON → Natural language
+- Add insights and context
+- Make data conversational
+- This is where MCP adds value
+
+**4. Mock Data (`src/data/mock-data.js`)**
+- Simulates database responses
+- Representative sample data
+- In production: replaced by real database
+
+---
+
+## Production vs Demo
+
+### Demo (This Repo)
+
+**API Client (`src/api/client.js`):**
+```javascript
+async getToolMetrics(toolId) {
+  // Simulate network delay
+  await this._simulateNetworkDelay();
+  
+  // Return mock data
+  const data = mockData.getCurrentMetrics(toolId);
+  return this._successResponse(data);
+}
+```
+
+**What it demonstrates:**
+- MCP tool → API client → Data source pattern
+- Request/response flow
+- Error handling
+- Response formatting
+
+### Production (vibe-data.com)
+
+**API Client:**
+```javascript
+async getToolMetrics(toolId) {
+  // Make real HTTP request
+  const response = await fetch(
+    `${this.baseURL}/tools/${toolId}/metrics`,
+    {
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: this.timeout
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error(`API error: ${response.status}`);
+  }
+  
+  return await response.json();
+}
+```
+
+**What changes:**
+- `fetch()` instead of mock data
+- Real authentication headers
+- Actual timeout handling
+- Production error handling
+- Rate limiting
+- Retry logic
+
+**Everything else stays the same:**
+- MCP tool definitions ✓
+- Response formatters ✓
+- Tool parameter schemas ✓
+- MCP server setup ✓
 
 ---
 
@@ -35,11 +195,10 @@ Claude uses the exposed tools to fetch data and present insights in natural lang
 
 ### Prerequisites
 
-- Node.js 18 or higher
-- Claude Desktop app (or any MCP-compatible client)
+* Node.js 18 or higher
+* Claude Desktop app (or any MCP-compatible client)
 
 ### Installation
-
 ```bash
 # Clone the repository
 git clone https://github.com/grzetich/ai-developer-tools-mcp.git
@@ -55,7 +214,6 @@ cp .env.example .env
 ### Running the Server
 
 **Option 1: Standalone Testing**
-
 ```bash
 # Run the server in stdio mode
 npm start
@@ -70,7 +228,6 @@ Add this configuration to your Claude Desktop config file:
 
 **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
-
 ```json
 {
   "mcpServers": {
@@ -87,72 +244,97 @@ Restart Claude Desktop. You should see the server listed in the MCP section.
 ### Testing It Works
 
 Ask Claude:
-> _"What are the most popular AI coding tools right now?"_
+
+> *"What are the most popular AI coding tools right now?"*
 
 Claude will use the `get_trending_tools` tool to fetch current data and present it to you.
 
 ---
 
-## Architecture
+## How The Bridge Pattern Works
 
-### High-Level Flow
-
+### Request Flow
+```mermaid
+sequenceDiagram
+    participant User
+    participant Claude
+    participant MCP as MCP Server<br/>(This Code)
+    participant API as REST API<br/>(Mock/Real)
+    participant DB as Database<br/>(Mock Data)
+    
+    User->>Claude: "What's Cursor's growth trend?"
+    Claude->>MCP: Call get_tool_history(tool: "cursor")
+    MCP->>API: GET /tools/cursor/history
+    API->>DB: Query historical data
+    DB-->>API: Return data rows
+    API-->>MCP: JSON response
+    Note over MCP: Format JSON → Natural language
+    MCP-->>Claude: "Cursor grew 55% to 8.1M downloads..."
+    Claude-->>User: Present formatted answer
 ```
-┌─────────┐          ┌─────────────┐          ┌──────────┐          ┌──────────┐
-│  User   │  asks    │   Claude    │  calls   │   MCP    │  queries │   Data   │
-│ (Human) │ ──────>  │ (AI Agent)  │ ──────>  │  Server  │ ──────>  │  Source  │
-└─────────┘          └─────────────┘          └──────────┘          └──────────┘
-                            │                       │                      │
-                            │   <───────────────────┘                      │
-                            │        Returns formatted                     │
-                            │        text response                         │
-                            │                                              │
-                            │   <──────────────────────────────────────────┘
-                            │         Presents insights
-                            │         to user
+
+### Code Example
+
+**User asks:** "What's Cursor's adoption trend?"
+
+**1. Claude decides to call the tool:**
+```json
+{
+  "tool": "get_tool_history",
+  "arguments": {
+    "tool": "cursor",
+    "months": 6
+  }
+}
 ```
 
-### Components
+**2. MCP tool receives call:**
+```javascript
+// src/tools/history.js
+async execute(args) {
+  const { tool, months } = args;
+  
+  // Call API client
+  const response = await apiClient.getToolHistory(tool, months);
+  
+  // Format JSON → Natural language
+  return formatHistory(response.data, tool, months);
+}
+```
 
-1. **MCP Server (`src/index.js`)**
-   - Implements the MCP protocol using the official SDK
-   - Uses stdio transport for Claude Desktop integration
-   - Handles tool registration and execution
-   - Provides error handling and logging
+**3. API client makes request:**
+```javascript
+// src/api/client.js
+async getToolHistory(toolId, months) {
+  // In demo: return mock data
+  // In production: fetch(`${baseURL}/tools/${toolId}/history?months=${months}`)
+  
+  const data = mockData.getHistoricalData(toolId, months);
+  return this._successResponse({ tool_id: toolId, data });
+}
+```
 
-2. **Tool Implementations (`src/tools/*.js`)**
-   - `compare.js` - Compare 2-3 tools across multiple metrics
-   - `trending.js` - Find fastest-growing tools by category
-   - `history.js` - Retrieve historical adoption data
-   - `search.js` - Search and filter tools by criteria
+**4. Formatter transforms response:**
+```javascript
+// src/utils/formatters.js
+export function formatHistory(apiResponse, toolId, months) {
+  const { data } = apiResponse;
+  
+  let output = `📈 ${toolId.toUpperCase()} - ${months} Month History\n\n`;
+  
+  data.forEach(point => {
+    output += `${point.month}: ${formatNumber(point.downloads)} downloads\n`;
+  });
+  
+  const growth = calculateGrowth(data);
+  output += `\n**Growth:** ${growth}% over ${months} months\n`;
+  
+  return output;
+}
+```
 
-3. **Data Layer (`src/data/mock-data.js`)**
-   - Mock data demonstrating real-world data structures
-   - In production: Replace with database queries or API calls
-   - Provides helper functions for calculations and filtering
-
-### Why This Architecture?
-
-**Stdio Transport**
-We use stdio (standard input/output) rather than HTTP because:
-- Simpler IPC mechanism - no network configuration needed
-- Standard for Claude Desktop integration
-- Secure - no open ports or authentication concerns
-- Perfect for single-user, local tools
-
-**Text-Based Responses**
-Tools return formatted text rather than JSON because:
-- Claude excels at working with natural language
-- Easier for users to read when Claude shows results
-- No parsing needed by the AI - it can directly quote or summarize
-- More flexible - Claude can adapt the presentation to context
-
-**Tool-Centric Design**
-Each tool has a single, focused responsibility:
-- Follows Unix philosophy: do one thing well
-- Makes it easier for Claude to choose the right tool
-- Simplifies testing and maintenance
-- Clear separation of concerns
+**5. Claude presents to user:**
+"Based on the data, Cursor has shown strong growth over the last 6 months, with downloads increasing from 5.2M to 8.1M (55.8% growth)..."
 
 ---
 
@@ -160,46 +342,26 @@ Each tool has a single, focused responsibility:
 
 ### 1. `compare_tools`
 
-**Description:** Compare adoption metrics between 2-3 AI developer tools
+Compare adoption metrics between 2-3 AI developer tools
 
 **Parameters:**
-```typescript
-{
-  tools: string[];        // Array of 2-3 tool IDs ['openai', 'anthropic', 'cursor', 'copilot', 'langchain']
-  time_range?: string;    // Time range: '7d', '30d', '90d' (default: '30d')
-}
-```
-
-**Example Usage:**
-```javascript
+```json
 {
   "tools": ["openai", "anthropic"],
   "time_range": "30d"
 }
 ```
 
-**Returns:**
-- NPM download comparison with growth indicators
-- Community activity metrics (GitHub stars, SO questions, Reddit mentions)
-- Key insights highlighting the leader and fastest-growing tool
+**Returns:** Side-by-side comparison with growth indicators and key insights
 
 ---
 
 ### 2. `get_trending_tools`
 
-**Description:** Get the fastest-growing AI developer tools ranked by growth rate
+Get the fastest-growing AI developer tools
 
 **Parameters:**
-```typescript
-{
-  time_range?: string;    // '7d', '30d', '90d' (default: '30d')
-  limit?: number;         // Max tools to return: 3-10 (default: 5)
-  category?: string;      // Filter: 'llm-api', 'editor', 'assistant', 'framework', 'all' (default: 'all')
-}
-```
-
-**Example Usage:**
-```javascript
+```json
 {
   "time_range": "30d",
   "limit": 5,
@@ -207,56 +369,32 @@ Each tool has a single, focused responsibility:
 }
 ```
 
-**Returns:**
-- Ranked list of tools by growth percentage
-- Current download metrics
-- Visual indicators for different growth levels (🔥 >50%, ⚡ >20%, 📈 others)
+**Returns:** Ranked list by growth percentage with current metrics
 
 ---
 
 ### 3. `get_tool_history`
 
-**Description:** Get historical adoption data and growth trends for a specific tool
+Get historical adoption data for a specific tool
 
 **Parameters:**
-```typescript
-{
-  tool: string;           // Tool ID: 'openai', 'anthropic', 'cursor', 'copilot', 'langchain'
-  months?: number;        // Number of months: 3-12 (default: 6)
-}
-```
-
-**Example Usage:**
-```javascript
+```json
 {
   "tool": "cursor",
   "months": 6
 }
 ```
 
-**Returns:**
-- Monthly download timeline
-- Growth analysis (total growth, rate per month)
-- Current metrics snapshot
+**Returns:** Monthly timeline with growth analysis
 
 ---
 
 ### 4. `search_tools`
 
-**Description:** Search and filter AI developer tools by various criteria
+Search and filter tools by criteria
 
 **Parameters:**
-```typescript
-{
-  category?: string;      // 'llm-api', 'editor', 'assistant', 'framework'
-  min_downloads?: number; // Minimum monthly downloads
-  keyword?: string;       // Search in name or description
-  sort_by?: string;       // 'downloads', 'stars', 'name' (default: 'downloads')
-}
-```
-
-**Example Usage:**
-```javascript
+```json
 {
   "category": "llm-api",
   "min_downloads": 10000000,
@@ -264,266 +402,199 @@ Each tool has a single, focused responsibility:
 }
 ```
 
-**Returns:**
-- Filtered and sorted list of tools
-- Full details for each tool (downloads, stars, community metrics)
-- Summary statistics
+**Returns:** Filtered list with full details and summary stats
+
+---
+
+## Migrating to Production
+
+### Step 1: Update API Client
+
+Replace mock calls with real HTTP requests:
+```javascript
+// src/api/client.js
+
+class ApiClient {
+  constructor(baseURL, options = {}) {
+    this.baseURL = baseURL;
+    this.apiKey = options.apiKey;
+    this.timeout = options.timeout || 5000;
+  }
+
+  async getToolMetrics(toolId) {
+    try {
+      const response = await fetch(
+        `${this.baseURL}/tools/${toolId}/metrics`,
+        {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          signal: AbortSignal.timeout(this.timeout)
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return this._successResponse(data);
+      
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        return this._errorResponse(408, 'Request timeout');
+      }
+      return this._errorResponse(500, error.message);
+    }
+  }
+  
+  // ... implement other methods similarly
+}
+
+// Configure with environment variables
+export const apiClient = new ApiClient(
+  process.env.API_BASE_URL || 'https://api.vibe-data.com',
+  {
+    apiKey: process.env.API_KEY,
+    timeout: parseInt(process.env.API_TIMEOUT) || 5000
+  }
+);
+```
+
+### Step 2: Add Authentication
+```javascript
+// .env
+API_BASE_URL=https://api.vibe-data.com
+API_KEY=your_api_key_here
+API_TIMEOUT=5000
+```
+
+### Step 3: Add Rate Limiting
+```javascript
+// src/api/client.js
+
+class ApiClient {
+  constructor(baseURL, options = {}) {
+    this.baseURL = baseURL;
+    this.apiKey = options.apiKey;
+    this.rateLimiter = new RateLimiter(options.rateLimit || 100); // 100 requests/min
+  }
+
+  async getToolMetrics(toolId) {
+    // Wait for rate limit
+    await this.rateLimiter.wait();
+    
+    // Make request...
+  }
+}
+```
+
+### Step 4: Add Retry Logic
+```javascript
+async getToolMetrics(toolId, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await fetch(/* ... */);
+      return response;
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      await this._exponentialBackoff(i);
+    }
+  }
+}
+
+_exponentialBackoff(attempt) {
+  const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
+  return new Promise(resolve => setTimeout(resolve, delay));
+}
+```
+
+### Step 5: Test
+
+Everything else (tools, formatters, MCP server) stays the same.
 
 ---
 
 ## Design Decisions
 
-### Tool Interface Design
+### Why Wrap an API Instead of Direct Database Access?
 
-**Why JSON Schema for Parameters?**
-MCP uses JSON Schema to define tool parameters because:
-- Claude can validate inputs before calling the tool
-- Provides autocomplete/suggestions in supporting clients
-- Self-documenting - the schema IS the documentation
-- Type safety without TypeScript
+**Separation of Concerns:**
+- API handles business logic, auth, rate limiting
+- MCP server focuses on conversation formatting
+- Don't duplicate logic in both places
 
-**Why Enums for Known Values?**
-We use enums (`enum: ['openai', 'anthropic', ...]`) instead of free text because:
-- Prevents typos and invalid inputs
-- Gives Claude a clear set of valid options
-- Better UX - Claude knows exactly what values are acceptable
-- Easier to maintain - add new tools in one place
+**Security:**
+- API is your security boundary
+- MCP server doesn't need database credentials
+- Same security rules apply to all clients
 
-### Error Handling Strategy
+**Maintainability:**
+- One codebase for business logic
+- API changes flow through automatically
+- MCP layer is thin and simple
 
-**Tool-Level Try/Catch**
-Each tool execution is wrapped in a try/catch to ensure:
-- One failing tool doesn't crash the entire server
-- Claude receives error messages it can show to users
-- Errors are logged for debugging but don't stop the conversation
+### Why Format Responses as Text?
+
+**Claude Excels at Language:**
+- Language models work best with text, not JSON
+- No parsing needed - Claude can directly quote or summarize
+- More flexible - Claude can adapt presentation to context
+
+**Better User Experience:**
+- Users see insights, not data structures
+- Natural conversation flow
+- Context and interpretation included
 
 **Example:**
-```javascript
-try {
-  const result = await tool.execute(args);
-  return { content: [{ type: 'text', text: result }] };
-} catch (error) {
-  console.error(`Error executing tool ${name}:`, error.message);
-  return {
-    content: [{ type: 'text', text: `Error: ${error.message}` }],
-    isError: true
-  };
-}
+
+**JSON response:**
+```json
+{"downloads": 8100000, "growth_pct": 55.8}
 ```
 
-### Response Formatting
+**Formatted text:**
+```
+Cursor grew 55% over the quarter, reaching 8.1M monthly 
+downloads, indicating strong developer adoption.
+```
 
-**Why Text Instead of JSON?**
-Tools return formatted text (with markdown) rather than JSON because:
-- Claude is fundamentally a language model - it excels at text
-- No parsing needed - Claude can directly quote, summarize, or reformat
-- More flexible - Claude can adapt presentation to user preference
-- Better for conversation - users see human-readable results
+Same data, but one is for machines and one is for humans.
 
-**Formatting Conventions:**
-- Emoji sparingly for visual hierarchy (📊 📈 🔍)
-- Markdown for structure (`**bold**`, bullets, code blocks)
-- Growth indicators (↑ ↓ ↔) for quick scanning
-- Timestamps for data freshness
+### Why One Tool Per Function?
 
-### Authentication Approach
+**Claude Performs Better:**
+- Clear, focused tools are easier for Claude to choose
+- Simpler parameter schemas
+- More predictable behavior
 
-**Current:** No authentication (local-only, mock data)
+**Easier to Maintain:**
+- Each tool has one responsibility
+- Independent testing
+- Clear documentation
 
-**For Production:**
-If connecting to real APIs or databases, consider:
-- **API Keys:** Simple, stored in `.env`, passed in request headers
-- **OAuth 2.0:** For user-specific data (see Vibe Data production implementation)
-- **Rate Limiting:** Prevent abuse with per-user quotas
-- **CORS/Origin Checks:** If exposing via HTTP transport
+**Composable:**
+- Claude can chain multiple tool calls
+- "Compare top 3 trending tools" = `get_trending` + `compare_tools`
 
 ---
 
-## What I Learned
+## Real-World Use Cases
 
-### 1. **API Design vs. Tool Design Are Different**
+This pattern works for any product with queryable data:
 
-When designing REST APIs, you optimize for developers:
-- Detailed error codes (400, 401, 403, 404, 500)
-- Structured JSON responses with nested objects
-- Versioning (/v1/, /v2/)
-- Comprehensive documentation with examples
+### B2B SaaS
+- **API:** Analytics platforms, customer dashboards
+- **MCP:** *"How's our MRR trending?"* *"Which customers churned?"*
 
-When designing MCP tools for AI agents, you optimize for conversation:
-- Descriptive error messages Claude can explain
-- Formatted text responses that read naturally
-- Simple, focused tools (not nested resources)
-- Schema IS the documentation
+### E-commerce
+- **API:** Inventory systems, order management
+- **MCP:** *"What products are low stock?"* *"Show me returns this week"*
 
-**Key Insight:** Think "what would be easy for Claude to narrate?" rather than "what's the most efficient data structure?"
-
-### 2. **Challenges in Tool Granularity**
-
-One of the hardest decisions was: **Should I have one tool or many?**
-
-**Option A:** Single `query_tools` tool with many parameters
-❌ Pro: Flexible, fewer tools to maintain
-❌ Con: Claude struggles to know when to use it, schema becomes complex
-
-**Option B:** Many specific tools (`compare`, `trending`, `history`, `search`)
-✅ Pro: Each tool has clear purpose, easier for Claude to select
-✅ Con: More code, potential overlap
-
-**Decision:** Go with specific tools. Claude performs better with clear, focused tools than with one mega-tool.
-
-### 3. **Documentation for AI vs. Humans**
-
-The `description` fields in tool schemas are more important than I initially thought:
-
-**Bad Description:**
-```javascript
-description: 'Compare tools'  // Too vague
-```
-
-**Good Description:**
-```javascript
-description: 'Compare adoption metrics between 2-3 AI developer tools (e.g., OpenAI vs Anthropic SDK)'
-```
-
-Claude reads these descriptions to decide which tool to use. Including:
-- What the tool does
-- Example use case
-- Key parameters
-
-...makes Claude much more likely to choose the right tool for the user's query.
-
----
-
-## Production Notes
-
-**This is a reference implementation for educational purposes.**
-
-For the production deployment at [vibe-data.com](https://vibe-data.com), the implementation includes:
-
-- **Real Database Integration:** PostgreSQL with historical data going back to June 2022
-- **Caching Layer:** Redis for frequently accessed metrics
-- **Rate Limiting:** Tiered limits (10 queries/day free, 100/day Pro, unlimited Enterprise)
-- **Authentication:** OAuth 2.1 + PKCE for user-specific features
-- **Monitoring:** Error tracking, usage analytics, performance metrics
-- **Multiple Data Sources:** NPM, GitHub, PyPI, Reddit, Stack Overflow, HackerNews, Twitter
-- **Sentiment Analysis:** NLP-based analysis of developer discussions
-- **API Endpoints:** REST API for web dashboard + MCP server for Claude
-- **Automated Scraping:** Daily data collection with deduplication
-- **Data Quality:** Schema validation, outlier detection, historical consistency checks
-
-**Production Architecture Differences:**
-- HTTP transport support for remote MCP clients
-- Database connection pooling with SSL
-- Graceful degradation when data sources are unavailable
-- Comprehensive logging and alerting
-- Horizontal scaling for high availability
-
-If you're interested in using this professionally, check out [vibe-data.com/pricing](https://vibe-data.com/pricing) or [contact me](mailto:ed.grzetich@gmail.com).
-
----
-
-## Development
-
-### Project Structure
-
-```
-ai-developer-tools-mcp/
-├── src/
-│   ├── index.js           # Main MCP server
-│   ├── data/
-│   │   └── mock-data.js   # Simplified mock data
-│   └── tools/
-│       ├── compare.js     # Compare tools
-│       ├── trending.js    # Trending tools
-│       ├── history.js     # Historical data
-│       └── search.js      # Search/filter tools
-├── test/
-│   └── test-tools.js      # Simple test suite
-├── .env.example           # Environment template
-├── .gitignore            # Git ignore rules
-├── package.json          # Dependencies
-├── LICENSE               # MIT License
-└── README.md             # This file
-```
-
-### Adding a New Tool
-
-1. Create `src/tools/my-tool.js`:
-
-```javascript
-export const myTool = {
-  name: 'my_tool_name',
-  description: 'What this tool does and when to use it',
-
-  inputSchema: {
-    type: 'object',
-    properties: {
-      param1: {
-        type: 'string',
-        description: 'What this parameter does'
-      }
-    },
-    required: ['param1']
-  },
-
-  async execute(args) {
-    const { param1 } = args;
-    // Your logic here
-    return 'Formatted text response';
-  }
-};
-```
-
-2. Import in `src/index.js`:
-
-```javascript
-import { myTool } from './tools/my-tool.js';
-
-const tools = [
-  compareTool,
-  trendingTool,
-  historyTool,
-  searchTool,
-  myTool  // Add your tool
-];
-```
-
-3. Test it:
-
-```bash
-npm test
-```
-
-### Extending with Real Data
-
-To connect to a real data source:
-
-1. Replace `src/data/mock-data.js` with real database queries or API calls
-2. Add connection logic in a new `src/data/database.js`
-3. Update tool implementations to call your data layer
-4. Add environment variables for credentials
-5. Implement caching if needed for performance
-
-**Example with PostgreSQL:**
-
-```javascript
-// src/data/database.js
-import pg from 'pg';
-const { Pool } = pg;
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
-
-export async function getCurrentMetrics(toolId) {
-  const result = await pool.query(
-    'SELECT * FROM latest_npm_stats WHERE package_name = $1',
-    [toolId]
-  );
-  return result.rows[0];
-}
-```
+### Internal Tools
+- **API:** Automated reports, integrations
+- **MCP:** *"Find pending invoices"* *"Compare Q3 vs Q4 sales"*
 
 ---
 
@@ -532,16 +603,16 @@ export async function getCurrentMetrics(toolId) {
 Contributions welcome! This is an educational project, so quality over quantity.
 
 **Good Contributions:**
-- Additional tools with clear use cases
-- Better mock data that demonstrates edge cases
-- Documentation improvements
-- Examples of using the server with different MCP clients
-- Performance optimizations
+* Additional tools with clear use cases
+* Better mock data demonstrating edge cases
+* Documentation improvements
+* Examples of production implementations
+* Testing improvements
 
 **Please Open an Issue First** to discuss:
-- Major architectural changes
-- New dependencies
-- Breaking changes to tool interfaces
+* Major architectural changes
+* New dependencies
+* Breaking changes to tool interfaces
 
 ---
 
@@ -553,28 +624,18 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
-- Built with the [Model Context Protocol](https://github.com/modelcontextprotocol) by Anthropic
-- Inspired by real production data platform at [Vibe Data](https://vibe-data.com)
-- Created as an educational resource for the AI developer community
-
----
-
-## Author
-
-**Ed Grzetich**
-Building AI development intelligence at [Vibe Data](https://vibe-data.com)
-
-- GitHub: [@grzetich](https://github.com/grzetich)
-- Website: [vibe-data.com](https://vibe-data.com)
-- Email: ed.grzetich@gmail.com
+* Built with the [Model Context Protocol](https://github.com/modelcontextprotocol) by Anthropic
+* Inspired by real production data platform at [Vibe Data](https://vibe-data.com)
+* Created as an educational resource for the AI developer community
 
 ---
 
 ## Learn More
 
-- [MCP Documentation](https://github.com/modelcontextprotocol/docs)
-- [Claude Desktop MCP Setup](https://docs.anthropic.com/claude/docs/model-context-protocol)
-- [Vibe Data Production Dashboard](https://vibe-data.com/dashboard)
+* [MCP Documentation](https://github.com/modelcontextprotocol/docs)
+* [Claude Desktop MCP Setup](https://docs.anthropic.com/claude/docs/model-context-protocol)
+* [Production Implementation: Vibe Data](https://vibe-data.com)
+* [Blog: Building MCP Servers as API Bridges](https://grzeti.ch/blog)
 
 ---
 
